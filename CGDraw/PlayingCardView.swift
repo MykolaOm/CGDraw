@@ -19,7 +19,7 @@ class PlayingCardView: UIView {
 
     var faceCardScale: CGFloat = SizeRatio.faceCardImageSizeToBoundsSize { didSet { setNeedsDisplay() } }
     
-    @ objc func adjustFaceCardScale(byHandlingGestureRecognizerBy recognizer: UIPinchGestureRecognizer) {
+    @objc func adjustFaceCardScale(byHandlingGestureRecognizedBy recognizer: UIPinchGestureRecognizer) {
         switch recognizer.state {
         case .changed:
             faceCardScale *= recognizer.scale
@@ -126,7 +126,7 @@ class PlayingCardView: UIView {
         
         if isFacedUp {
             if let faceCardImage = UIImage(named: rankString+suit, in: Bundle(for: self.classForCoder), compatibleWith: traitCollection) {
-                faceCardImage.draw(in: bounds.zoom(by: SizeRatio.faceCardImageSizeToBoundsSize))
+                faceCardImage.draw(in: bounds.zoom(by: faceCardScale))
             } else {
                 drawPips()
             }
