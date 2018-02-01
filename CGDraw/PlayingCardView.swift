@@ -8,13 +8,27 @@
 
 import UIKit
 
+@IBDesignable
 class PlayingCardView: UIView {
-    
-    var rank: Int = 5 { didSet { setNeedsDisplay();setNeedsLayout() } }
-    var suit: String = "❤️" { didSet { setNeedsDisplay();setNeedsLayout() } }
+    @IBInspectable
+    var rank: Int = 12 { didSet { setNeedsDisplay();setNeedsLayout() } }
+    @IBInspectable
+    var suit: String = "♥️" { didSet { setNeedsDisplay();setNeedsLayout() } }
+    @IBInspectable
     var isFacedUp: Bool = true { didSet { setNeedsDisplay();setNeedsLayout() } }
 
-    private func centredAttributedString(_ string: String, fontSize: CGFloat) -> NSAttributedString {
+    var faceCardScale: CGFloat = SizeRatio.faceCardImageSizeToBoundsSize { didSet { setNeedsDisplay() } }
+    
+    @ objc func adjustFaceCardScale(byHandlingGestureRecognizerBy recognizer: UIPinchGestureRecognizer) {
+        switch recognizer.state {
+        case .changed:
+            faceCardScale *= recognizer.scale
+            recognizer.scale = 1.0
+        default: break
+        }
+    }
+    
+    private func centeredAttributedString(_ string: String, fontSize: CGFloat) -> NSAttributedString {
         var font = UIFont.preferredFont(forTextStyle: .body).withSize(fontSize)
         font = UIFontMetrics(forTextStyle: .body).scaledFont(for: font)
         let paragraphStyle = NSMutableParagraphStyle()
@@ -23,7 +37,7 @@ class PlayingCardView: UIView {
     }
     
     private var cornerString: NSAttributedString {
-        return centredAttributedString(rankString + "\n" + suit, fontSize: cornerFontSize)
+        return centeredAttributedString(rankString + "\n" + suit, fontSize: cornerFontSize)
     }
     
     private lazy var upperLeftCornerLabel: UILabel = createCornerLabel()
@@ -60,15 +74,72 @@ class PlayingCardView: UIView {
         
         lowerRightCornerLabel.frame.origin = CGPoint(x: bounds.maxX, y: bounds.maxY).offsetBy(dx: -cornerOffset, dy: -cornerOffset).offsetBy(dx: -lowerRightCornerLabel.frame.size.width, dy: -lowerRightCornerLabel.frame.size.height)
     }
+    //========
+    private func drawPips()
+    {
+        let pipsPerRowForRank = [[0], [1], [1,1], [1,1,1], [2,2], [2,1,2], [2,2,2], [2,1,2,2], [2,2,2,2], [2,2,1,2,2], [2,2,2,2,2]]
+        
+        func createPipString(thatFits pipRect: CGRect) -> NSAttributedString {
+            let maxVerticalPipCount = CGFloat(pipsPerRowForRank.reduce(0) { max($1.count, $0)})
+            let maxHorizontalPipCount = CGFloat(pipsPerRowForRank.reduce(0) { max($1.max() ?? 0, $0)})
+            let verticalPipRowSpacing = pipRect.size.height / maxVerticalPipCount
+            let attemptedPipString = centeredAttributedString(suit, fontSize: verticalPipRowSpacing)
+            let probablyOkayPipStringFontSize = verticalPipRowSpacing / (attemptedPipString.size().height / verticalPipRowSpacing)
+            let probablyOkayPipString = centeredAttributedString(suit, fontSize: probablyOkayPipStringFontSize)
+            if probablyOkayPipString.size().width > pipRect.size.width / maxHorizontalPipCount {
+                return centeredAttributedString(suit, fontSize: probablyOkayPipStringFontSize /
+                    (probablyOkayPipString.size().width / (pipRect.size.width / maxHorizontalPipCount)))
+            } else {
+                return probablyOkayPipString
+            }
+        }
+        
+        if pipsPerRowForRank.indices.contains(rank) {
+            let pipsPerRow = pipsPerRowForRank[rank]
+            var pipRect = bounds.insetBy(dx: cornerOffset, dy: cornerOffset).insetBy(dx: cornerString.size().width, dy: cornerString.size().height / 2)
+            let pipString = createPipString(thatFits: pipRect)
+            let pipRowSpacing = pipRect.size.height / CGFloat(pipsPerRow.count)
+            pipRect.size.height = pipString.size().height
+            pipRect.origin.y += (pipRowSpacing - pipRect.size.height) / 2
+            for pipCount in pipsPerRow {
+                switch pipCount {
+                case 1:
+                    pipString.draw(in: pipRect)
+                case 2:
+                    pipString.draw(in: pipRect.leftHalf)
+                    pipString.draw(in: pipRect.rightHalf)
+                default:
+                    break
+                }
+                pipRect.origin.y += pipRowSpacing
+            }
+        }
+    }
+    //=========
+    
     
     override func draw(_ rect: CGRect) {
         let roundedRect = UIBezierPath(roundedRect: bounds, cornerRadius: cornerRadius)
         roundedRect.addClip()
         UIColor.white.setFill()
         roundedRect.fill()
+        
+        if isFacedUp {
+            if let faceCardImage = UIImage(named: rankString+suit, in: Bundle(for: self.classForCoder), compatibleWith: traitCollection) {
+                faceCardImage.draw(in: bounds.zoom(by: SizeRatio.faceCardImageSizeToBoundsSize))
+            } else {
+                drawPips()
+            }
+            
+        }
+        else {
+            if let carcBackImage = UIImage(named: "cardback", in: Bundle(for: self.classForCoder), compatibleWith: traitCollection){
+                carcBackImage.draw(in: bounds)
+            }
+            
+        }
     }
    
-
 }
 
 extension PlayingCardView {
@@ -102,23 +173,44 @@ extension PlayingCardView {
 }
 
 extension CGRect {
+//    var leftHalf: CGRect {
+//        return CGRect(x: minX, y: minY, width: width/2, height: height)
+//    }
+//    var rightHalf: CGRect {
+//        return CGRect(x: minX, y: minY, width: width/2, height: height)
+//    }
+//    func inset(by size: CGSize) -> CGRect {
+//        return insetBy(dx: size.width, dy: size.height)
+//    }
+//    func sized(to size: CGSize) -> CGRect {
+//        return CGRect(origin: origin, size: size)
+//    }
+//    func zoom(by scale: CGFloat) -> CGRect {
+//        let newWidth = width * scale
+//        let newHeight = height * scale
+//        return insetBy(dx: (width - newWidth) / 2, dy: (height - newHeight) / 2)
+//    }
+    
+    func zoom(by zoomFactor: CGFloat) -> CGRect {
+        let zoomedWidth = size.width * zoomFactor
+        let zoomedHeight = size.height * zoomFactor
+        let originX = origin.x + (size.width - zoomedWidth) / 2
+        let originY = origin.y + (size.height - zoomedHeight) / 2
+        return CGRect(origin: CGPoint(x: originX,y: originY) , size: CGSize(width: zoomedWidth, height: zoomedHeight))
+    }
+    
     var leftHalf: CGRect {
-        return CGRect(x: minX, y: minY, width: width/2, height: height)
+        let width = size.width / 2
+        return CGRect(origin: origin, size: CGSize(width: width, height: size.height))
     }
+    
     var rightHalf: CGRect {
-        return CGRect(x: minX, y: minY, width: width/2, height: height)
+        let width = size.width / 2
+        return CGRect(origin: CGPoint(x: origin.x + width, y: origin.y), size: CGSize(width: width, height: size.height))
     }
-    func inset(by size: CGSize) -> CGRect {
-        return insetBy(dx: size.width, dy: size.height)
-    }
-    func sized(to size: CGSize) -> CGRect {
-        return CGRect(origin: origin, size: size)
-    }
-    func zoom(by scale: CGFloat) -> CGRect {
-        let newWidth = width * scale
-        let newHeight = height * scale
-        return insetBy(dx: (width - newWidth) / 2, dy: (height - newHeight) / 2)
-    }
+    
+    
+    
 }
 
 extension CGPoint {
